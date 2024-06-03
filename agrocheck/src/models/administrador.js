@@ -1,19 +1,19 @@
 const sequelize = require('./coneccion.js');
-const cosechador = sequelize.define('cosechador', {
-    rut_cosechador:{
+const administrador = sequelize.define('administrador', {
+    rut_administrador:{
         type:DataTypes.STRING,
         allowNull: false,
         primaryKey:true,
         unique: true
     },
-    nombre_cosechador: {
+    nombre_administrador: {
       type: Sequelize.STRING,
       allowNull: false,
     },
     rol: {
         type: DataTypes.STRING,
         allowNull: true,
-        defaultValue: 'cosechador'
+        defaultValue: 'administrador'
     },
     estado: {
         type: DataTypes.STRING,
@@ -22,4 +22,4 @@ const cosechador = sequelize.define('cosechador', {
     }
 
   });
-  cosechador.belongsTo(rol); 
+  administrador.belongsTo(rol); 

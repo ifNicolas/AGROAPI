@@ -1,10 +1,5 @@
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize('agrodb', 'root', '', {
-    host: 'localhost',
-    dialect: 'mysql',
-    define: {
-        timestamps: false,} 
-});
+const { Sequelize, DataTypes , Model} = require('sequelize');
+
  
 const rol = sequelize.define('rol', {
     tipo_rol: {

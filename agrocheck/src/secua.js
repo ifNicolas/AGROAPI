@@ -1,6 +1,6 @@
+//require express
 const express = require('express');
 const app = express();
-const { Sequelize, where,Op } = require('sequelize');
 //importaciones modelos
 const operador = require('./models/operador');
 const fruta = require('./models/fruta');
@@ -8,29 +8,12 @@ const ubicacion = require('./models/ubicacion');
 //coneccion express
 app.use(express.json()); // Middleware para analizar el cuerpo de la solicitud
 const port = 3000; // Puedes usar el puerto que prefieras
-
 app.listen(port, () => {
     console.log(`La aplicación está corriendo en http://localhost:${port}`);
 });
-
-
-// Parámetros de conexión
-const sequelize = new Sequelize('agrodb', 'root', '', {
-    host: 'localhost',
-    dialect: 'mysql'
-});
-
-async function authenticateDatabase() {
-    try {
-        await sequelize.authenticate();
-        console.log('La conexión ha sido establecida exitosamente.');
-    } catch (error) {
-        console.error('No se pudo conectar a la base de datos:', error);
-    }
-}
-
-authenticateDatabase();
-
+//coneccion sequalize
+const sequelize = require('./coneccion.js');
+sequelize()
 
 //crud operadores : tabla : operador
 
@@ -82,7 +65,8 @@ app.put('/api/actualizarOperador/:rut', async(req,res)=>{
 app.get('/api/barraBusquedaOperador', async (req, res) => {
     try {
         const { busqueda } = req.query;
-        
+        //todo en minusculas
+        //rutificador
         const resultados = await operador.findAll({
             where: {
                 [Op.or]: [
@@ -224,3 +208,24 @@ app.get('/api/barraBusquedaUbicacion',async(req,res)=>{
 //
 //control de usuarios
 //
+app.get('/login/:rut', async (req, res) => {
+    // Buscar el usuario en todas las tablas de usuarios
+    const userOperador = await operador.findOne({ where: { rut: req.params.rut } });
+    const userCosechador = await cosechador.findOne({ where: { rut: req.params.rut } });
+    const userAdmin = await administrador.findOne({ where: { rut: req.params.rut } });
+
+    // Determinar qué tipo de usuario es
+    let user;
+    if (userOperador) {
+        user = userOperador;
+    } else if (userCosechador) {
+        user = userCosechador;
+    } else if (userAdmin) {
+        user = userAdmin;
+    } else {
+        return res.status(404).send({ message: 'Usuario no encontrado' });
+    }
+
+    // En este punto, 'user' es el usuario que encontraste y puedes acceder a su rol
+    res.send({ rut: user.rut, role: user.role });
+});
