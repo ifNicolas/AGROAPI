@@ -1,4 +1,14 @@
-const sequelize = require('./coneccion.js');
+
+const {Sequelize,DataTypes} = require('sequelize');
+
+const sequelize = new Sequelize('agrodb', 'root', '', {
+    host: 'localhost',
+    dialect: 'mysql',
+    define: {
+        timestamps: false,
+    } 
+});
+
 const administrador = sequelize.define('administrador', {
     rut_administrador:{
         type:DataTypes.STRING,
@@ -10,16 +20,25 @@ const administrador = sequelize.define('administrador', {
       type: Sequelize.STRING,
       allowNull: false,
     },
-    rol: {
+    contraseña: {
+        type: DataTypes.STRING,
+        allowNull: false
+    },
+    rol_user: {
         type: DataTypes.STRING,
         allowNull: true,
         defaultValue: 'administrador'
-    },
+    },  
     estado: {
         type: DataTypes.STRING,
         allowNull: true,
         defaultValue: 'Activa'
     }
 
+  },{
+    sequelize,
+    modelName: 'administrador',
+    tableName: 'administrador',
   });
-  administrador.belongsTo(rol); 
+
+  module.exports = administrador;

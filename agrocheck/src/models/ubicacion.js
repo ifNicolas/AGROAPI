@@ -1,12 +1,9 @@
-const { Sequelize, DataTypes , Model} = require('sequelize');
+const { DataTypes , Model} = require('sequelize');
+const sequelize = require('./sequelize'); // Importa la instancia de Sequelize
+const bines = require('./bines');
 
 
-const sequelize = new Sequelize('agrodb', 'root', '', {
-    host: 'localhost',
-    dialect: 'mysql',
-    define: {
-        timestamps: false,} 
-});
+
 
 class ubicacion extends Model {}
 
@@ -25,5 +22,7 @@ ubicacion.init({
     modelName: 'ubicacion',
     tableName: 'ubicacion',
 });
+
+// ubicacion.hasMany(bines, { foreignKey: 'lugar_id', as: 'lugar_id' });
 
 module.exports = ubicacion;

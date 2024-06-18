@@ -5,7 +5,8 @@ const sequelize = new Sequelize('agrodb', 'root', '', {
     host: 'localhost',
     dialect: 'mysql',
     define: {
-        timestamps: false,} 
+        timestamps: false,
+    } 
 });
 
 class operador extends Model {}
@@ -24,7 +25,7 @@ operador.init({
         type: DataTypes.STRING,
         allowNull: false
     },
-    rol: {
+    rol_user: {
         type: DataTypes.STRING,
         allowNull: true,
         defaultValue: 'operador'

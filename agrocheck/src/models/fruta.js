@@ -1,12 +1,7 @@
-const { Sequelize, DataTypes , Model} = require('sequelize');
+const {  DataTypes , Model} = require('sequelize');
+const bines = require('./bines');
+const sequelize = require('./sequelize'); // Importa la instancia de Sequelize
 
-
-const sequelize = new Sequelize('agrodb', 'root', '', {
-    host: 'localhost',
-    dialect: 'mysql',
-    define: {
-        timestamps: false,} 
-});
 
 class fruta extends Model {}
 

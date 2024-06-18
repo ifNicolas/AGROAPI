@@ -1,10 +1,19 @@
 //require express
 const express = require('express');
+const session = require('express-session');
 const app = express();
 //importaciones modelos
+//usuarios
 const operador = require('./models/operador');
+const administrador = require('./models/administrador');
+const cosechador = require('./models/cosechador');
+//end usuarios
+//modelos 
 const fruta = require('./models/fruta');
 const ubicacion = require('./models/ubicacion');
+const entrega = require('./models/entrega');
+const bines = require('./models/bines');
+
 //coneccion express
 app.use(express.json()); // Middleware para analizar el cuerpo de la solicitud
 const port = 3000; // Puedes usar el puerto que prefieras
@@ -12,8 +21,93 @@ app.listen(port, () => {
     console.log(`La aplicación está corriendo en http://localhost:${port}`);
 });
 //coneccion sequalize
-const sequelize = require('./coneccion.js');
-sequelize()
+const { Sequelize, DataTypes, Op } = require('sequelize');
+
+
+
+const sequelize = new Sequelize('agrodb', 'root', '', {
+    host: 'localhost',
+    dialect: 'mysql',
+    define: {
+        timestamps: false,
+    } 
+});
+async function authenticateDatabase() {
+    try {
+        await sequelize.authenticate();
+        console.log('La conexión ha sido establecida exitosamente.');
+    } catch (error) {
+        console.error('No se pudo conectar a la base de datos:', error);
+    }
+}
+authenticateDatabase();
+//coneccion por sesion 
+app.use(session({
+    secret: 'sin secretos',
+    resave: false, 
+    saveUninitialized: false, 
+       cookie: {
+      maxAge: 60 * 60 * 1000, // una hora
+      secure: false, // 
+    }
+  }));
+//
+//login 
+app.post('/api/login/administrador', async (req, res) => {
+    const { rut, password } = req.body;
+    
+    // Intenta encontrar al administrador
+    let user = await administrador.findOne({ where: { rut_administrador: rut, contraseña: password } });
+    
+    if (user) {
+      req.session.user = user.dataValues; // Guardar el usuario en la sesión
+      req.session.user.role = user.dataValues.rol_user; // Guardar el rol del usuario en la sesión
+      res.send({ message: 'Inicio de sesión exitoso', user: req.session.user });
+    } else {
+      res.status(401).send({ message: 'RUT o contraseña incorrectos' });
+    }
+  });
+  
+  app.post('/api/login/operador', async (req, res) => {
+    const { rut, password } = req.body;
+    
+    // Intenta encontrar al operador
+    let user = await operador.findOne({ where: { rut_operador: rut, contraseña: password } });
+    
+    if (user) {
+      req.session.user = user.dataValues; // Guardar el usuario en la sesión
+      req.session.user.role = user.dataValues.rol_user; // Guardar el rol del usuario en la sesión
+      res.send({ message: 'Inicio de sesión exitoso' });
+    } else {
+      res.status(401).send({ message: 'RUT o contraseña incorrectos' });
+    }
+  });
+  
+  app.post('/api/login/cosechador', async (req, res) => {
+    const { rut } = req.body;
+    
+    // Intenta encontrar al cosechador
+    let user = await cosechador.findOne({ where: { rut_cosechador: rut } });
+    
+    if (user) {
+      req.session.user = user.dataValues; // Guardar el usuario en la sesión
+      req.session.user.role = user.dataValues.rol_user; // Guardar el rol del usuario en la sesión
+      res.send({ message: 'Inicio de sesión exitoso' });
+    } else {
+      res.status(401).send({ message: 'RUT incorrecto' });
+    }
+  });
+  
+  //loogut
+  
+  app.post('/api/logout', (req, res) => {
+    if(!session){
+        res.send({message: session.user.dataValues})
+    }
+    req.session.destroy(); // Destruir la sesión
+    res.send({ message: 'Cierre de sesión exitoso' });
+  });
+
 
 //crud operadores : tabla : operador
 
@@ -65,8 +159,7 @@ app.put('/api/actualizarOperador/:rut', async(req,res)=>{
 app.get('/api/barraBusquedaOperador', async (req, res) => {
     try {
         const { busqueda } = req.query;
-        //todo en minusculas
-        //rutificador
+        
         const resultados = await operador.findAll({
             where: {
                 [Op.or]: [
@@ -206,26 +299,114 @@ app.get('/api/barraBusquedaUbicacion',async(req,res)=>{
     }
 });
 //
-//control de usuarios
-//
-app.get('/login/:rut', async (req, res) => {
-    // Buscar el usuario en todas las tablas de usuarios
-    const userOperador = await operador.findOne({ where: { rut: req.params.rut } });
-    const userCosechador = await cosechador.findOne({ where: { rut: req.params.rut } });
-    const userAdmin = await administrador.findOne({ where: { rut: req.params.rut } });
+//Control de bines
+app.get('/api/buscarBines', async(req, res) => {
 
-    // Determinar qué tipo de usuario es
-    let user;
-    if (userOperador) {
-        user = userOperador;
-    } else if (userCosechador) {
-        user = userCosechador;
-    } else if (userAdmin) {
-        user = userAdmin;
-    } else {
-        return res.status(404).send({ message: 'Usuario no encontrado' });
+    try {
+        const resultados = await bines.findAll();
+           
+            res.send(resultados);
+    } catch(error){
+            res.status(500).send(error);
+    }
+    });
+    
+app.post('/api/ingresarBines', async(req, res) => {
+    try {
+        const nuevoBin = await bines.create(req.body);
+        res.status(201).send(nuevoBin);
+    } catch(error) {
+        res.status(500).send(error);
+    }
+});
+    
+
+//control de usuarios
+
+//midelaware  -> este lo utilizare para ver los roles
+function checkRole(role){
+    return function(req, res, next){
+        if(req.user.role === role){
+            next(); // si el rol = usuarios -> siguiente funcion
+        }else{
+            res.status(403).send('Acceso denegado');// si es !user = erro 403
+        }
+    }
+}
+//utilidades operador
+
+/**ruta entregas */
+app.post('/api/ingresarEntrega', async (req, res) => {
+    const { qrCode, cantidad } = req.body;
+  
+    // Verificar si el operador está autenticado
+    if (!req.session.user || req.session.user.role !== 'operador') {
+      return res.status(401).send({ message: 'Debes iniciar sesión como operador para ingresar una entrega' });
+    }
+  
+    // Buscar al cosechador por el código QR
+    const cosechadorEncontrado = await cosechador.findOne({ where: { qr_code: qrCode } });
+    if (!cosechadorEncontrado) {
+      return res.status(404).send({ message: 'Cosechador no encontrado' });
+    }
+  
+    // Crear la entrega
+    const fechaActual = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const Entrega = await entrega.create({ fecha: fechaActual, cantidad, rut_cosechador: cosechadorEncontrado.rut_cosechador });
+
+    res.send({ message: 'Entrega ingresada exitosamente', Entrega });
+});
+
+//utilidades cosechador
+
+
+// Obtener la cantidad total de entregas de cada cosechador por día
+app.get('/api/entregasPorDia', async (req, res) => {
+    const entregas = await entrega.findAll({
+        attributes: ['rut_cosechador', [sequelize.fn('date', sequelize.col('fecha')), 'fecha'], [sequelize.fn('sum', sequelize.col('cantidad')), 'total']],
+        group: ['rut_cosechador', 'fecha']
+    });
+    
+    res.json(entregas);
+});
+
+// Calcular el rendimiento entre semanas
+app.get('/api/rendimientoSemanal', async (req, res) => {
+    // Verificar si el cosechador está autenticado
+    if (!req.session.user || req.session.user.role !== 'cosechador') {
+      return res.status(401).send({ message: 'Debes iniciar sesión como cosechador para ver el rendimiento' });
     }
 
-    // En este punto, 'user' es el usuario que encontraste y puedes acceder a su rol
-    res.send({ rut: user.rut, role: user.role });
+    // Obtener la fecha actual y la fecha de inicio de la semana
+    const ahora = new Date();
+    const inicioSemana = new Date();
+    inicioSemana.setDate(ahora.getDate() - ahora.getDay());
+    const inicioSemanaPasada = new Date();
+    inicioSemanaPasada.setDate(inicioSemana.getDate() - 7);
+
+    // Calcular las entregas de esta semana y la semana pasada
+    const entregasEstaSemana = await entrega.count({ 
+        where: { 
+            rut_cosechador: req.session.user.rut_cosechador,
+            fecha: {
+                [Op.gte]: inicioSemana
+            }
+        } 
+    });
+    const entregasSemanaPasada = await entrega.count({ 
+        where: { 
+            rut_cosechador: req.session.user.rut_cosechador,
+            fecha: {
+                [Op.between]: [inicioSemanaPasada, inicioSemana]
+            }
+        } 
+    });
+
+    // Calcular el rendimiento
+    const rendimiento = ((entregasEstaSemana - entregasSemanaPasada) / entregasSemanaPasada) * 100;
+
+    res.send({ message: `El rendimiento entre esta semana y la semana pasada es del ${rendimiento}%` });
 });
+
+
+//utilidades administrador
