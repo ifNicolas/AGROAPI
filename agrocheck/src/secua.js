@@ -2,6 +2,10 @@
 const express = require('express');
 const session = require('express-session');
 const app = express();
+const QRCode = require('qrcode');
+const cors = require('cors')
+const { v4: uuid } = require('uuid');
+
 //importaciones modelos
 //usuarios
 const operador = require('./models/operador');
@@ -13,7 +17,7 @@ const fruta = require('./models/fruta');
 const ubicacion = require('./models/ubicacion');
 const entrega = require('./models/entrega');
 const bines = require('./models/bines');
-
+const qrModel = require('./models/qr');
 //coneccion express
 app.use(express.json()); // Middleware para analizar el cuerpo de la solicitud
 const port = 3000; // Puedes usar el puerto que prefieras
@@ -51,7 +55,8 @@ app.use(session({
       secure: false, // 
     }
   }));
-//
+//use cors
+app.use(cors());
 //login 
 app.post('/api/login/administrador', async (req, res) => {
     const { rut, password } = req.body;
@@ -228,8 +233,7 @@ app.get('/api/barraBusquedaFruta',async(req,res)=>{
    
         const resultado = await fruta.findAll({
             where: {
-                [Op.or]:[{nombre_fruta:{ [Op.like]: busqueda.trim() + '%' }}
-            ]
+                [Op.or]:[{nombre_fruta:{ [Op.like]: busqueda.trim() + '%' }}]
             }
         });
         res.json(resultado);
@@ -276,7 +280,7 @@ app.put('/api/actualizarUbicacion/:id', async(req,res)=>{
                 id:req.params.id
             }
         });
-        res.send({message:'ubicaacion actualizada con exito'});
+        res.send({message:'ubicacion actualizada con exito'});
     }catch(error){
         res.status(500).send(error);
     }
@@ -319,6 +323,41 @@ app.post('/api/ingresarBines', async(req, res) => {
         res.status(500).send(error);
     }
 });
+//filtrado de bines
+app.get('/api/filtroBines', async (req, res) => {
+    try {
+        const { busqueda } = req.query;
+
+        const resultado = await bines.findAll({
+            where: {
+                [Op.or]: [
+                    { lugar_id: { [Op.like]: busqueda.trim() + '%' } },
+                    { fruta_id: { [Op.like]: busqueda.trim() + '%' } },
+                    { fecha: { [Op.like]: busqueda.trim() + '%' } },
+                    { estado: { [Op.like]: busqueda.trim() + '%' } }
+                ]
+            },
+            include: [ // Agrega esta sección para incluir los nombres correspondientes
+                { model: ubicacion, as: 'lugar', attributes: ['nombre_sector'] },
+                { model: fruta, as: 'fruta', attributes: ['nombre_fruta'] }
+            ]
+        });
+
+        // Mapea los resultados para mostrar los nombres en lugar de los IDs
+        const resultadosConNombres = resultado.map(item => ({
+            id: item.id,
+            lugar_nombre: item.lugar.nombre,
+            fruta_nombre: item.fruta.nombre,
+            fecha: item.fecha,
+            estado: item.estado
+        }));
+
+        res.json(resultadosConNombres);
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+
     
 
 //control de usuarios
@@ -408,5 +447,55 @@ app.get('/api/rendimientoSemanal', async (req, res) => {
     res.send({ message: `El rendimiento entre esta semana y la semana pasada es del ${rendimiento}%` });
 });
 
-
-//utilidades administrador
+// Función para generar un identificador único
+function generateIdentifier() {
+    // Implementar la lógica para generar un identificador único (por ejemplo, contador, cadena aleatoria)
+    return identifier;
+  }
+  
+  app.get('/api/generateQR/:cantidad', async (req, res) => {
+    try {
+      const cantidad = parseInt(req.params.cantidad);
+      if (isNaN(cantidad) || cantidad <= 0) {
+        return res.status(400).send('Cantidad inválida');
+      }
+  
+      const qrCodes = [];
+      const qrCodesFolder = './qr_codes/'; // Ajustar la ruta según el proyecto
+  
+      // Define the generateIdentifier function
+      function generateIdentifier() {
+        const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+        let identifier = '';
+        for (let i = 0; i < 10; i++) { // Generate 10-character identifiers
+          identifier += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return identifier;
+      }
+  
+      for (let i = 0; i < cantidad; i++) {
+        const identifier = generateIdentifier(); // Call the function here
+        const url = `http://localhost:3000/qrcode/${identifier}`;
+        const qrCodeImage = await QRCode.toFile(`${qrCodesFolder}qr_${identifier}.png`, url);
+  
+        // Almacenar los datos en la base de datos (usando Sequelize)
+        await qrModel.create({
+          rut_asociado: null, // Ajustar según las necesidades
+          estado: 'Activo',
+          qr_code_identifier: identifier, // Usar el identificador como identificador único
+          qr_code: url, // Almacenar la URL construida
+          qr_path: `${qrCodesFolder}qr_${identifier}.png`, // Ruta del archivo generado
+        });
+  
+        qrCodes.push({ identifier, url }); // Devolver el identificador y la URL en la respuesta
+      }
+  
+      res.json({ qrCodes });
+    } catch (err) {
+      console.error('Error generando códigos QR:', err);
+      res.status(500).send('Error interno del servidor');
+    }
+  });
+  
+  
+  
